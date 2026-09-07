@@ -1,0 +1,42 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper function to check if user is admin
+    function isAdmin() {
+      return request.auth != null && request.auth.token.admin == true;
+    }
+    
+    // Helper function to check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Dresses collection - public read, admin write
+    match /dresses/{dressId} {
+      allow read: if true; // Public can view all dresses
+      allow create, update, delete: if isAdmin();
+    }
+    
+    // Orders collection - anyone can create, admin can read all, users can read their own
+    match /orders/{orderId} {
+      allow read: if isAdmin() || (isAuthenticated() && request.auth.uid == resource.data.userId);
+      // Allow guest checkout - anyone can create orders with valid data
+      allow create: if request.resource.data.phone != null 
+                    && request.resource.data.items != null 
+                    && request.resource.data.total != null;
+      allow update, delete: if isAdmin();
+    }
+    
+    // Users collection - users can read/write their own data, admin can read all
+    match /users/{userId} {
+      allow read: if isAdmin() || (isAuthenticated() && request.auth.uid == userId);
+      allow write: if isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    // Cart collection - users can read/write their own cart
+    match /carts/{userId} {
+      allow read, write: if isAuthenticated() && request.auth.uid == userId;
+    }
+  }
+}
